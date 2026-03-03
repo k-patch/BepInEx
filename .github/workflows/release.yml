@@ -1,0 +1,93 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'   # e.g. v6.0.0, v6.1.2-beta.1
+
+jobs:
+  release:
+    name: Build & Publish Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed to create GitHub Releases
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history is required for git describe in the build script
+
+      # ── 2. Collect metadata ────────────────────────────────────────────────
+      - name: Collect build info
+        id: info
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Strip the leading 'v' from the tag name (e.g. v6.0.0 → 6.0.0)
+            const tag = context.ref.replace('refs/tags/', '');
+            const version = tag.startsWith('v') ? tag.slice(1) : tag;
+
+            core.setOutput('tag', tag);
+            core.setOutput('version', version);
+
+            // Short SHA for artifact naming
+            let shortHash = '';
+            await exec.exec('git', ['rev-parse', '--short', 'HEAD'], {
+              listeners: { stdout: d => shortHash += d.toString().trim() }
+            });
+            core.setOutput('sha_short', shortHash);
+
+      # ── 3. .NET SDK ────────────────────────────────────────────────────────
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
+      # ── 4. Restore dependency download cache ───────────────────────────────
+      - name: Cache build dependencies
+        uses: actions/cache@v4
+        with:
+          path: ./bin/.dep_cache
+          key: dep-cache-${{ hashFiles('build/Program.cs') }}
+          restore-keys: dep-cache-
+
+      # ── 5. Build (Release mode) ────────────────────────────────────────────
+      - name: Build
+        run: |
+          ./build.sh --target Publish --build-type Release
+
+      # ── 6. Generate changelog ──────────────────────────────────────────────
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          
+          echo "## 🚀 Change Summary" > /tmp/changelog.md
+          if [ -z "$PREV_TAG" ]; then
+            echo "Initial release for BepInEx v6.0.0 pre-release series." >> /tmp/changelog.md
+          else
+            echo "Changes since $PREV_TAG:" >> /tmp/changelog.md
+            git log --no-merges --pretty="format:* %s (%h)" ${PREV_TAG}..HEAD >> /tmp/changelog.md
+          fi
+          
+          echo -e "\n\n## 🛠 Build Info\n* Version: ${{ steps.info.outputs.version }}\n* Commit: ${{ steps.info.outputs.sha_short }}" >> /tmp/changelog.md
+          echo "prev_tag=${PREV_TAG}" >> "$GITHUB_OUTPUT"
+
+      # ── 7. Create GitHub Release with all ZIP artifacts ───────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.info.outputs.tag }}
+          name: BepInEx ${{ steps.info.outputs.version }}
+          body_path: /tmp/changelog.md
+          draft: false
+          prerelease: ${{ contains(steps.info.outputs.tag, '-') }}   # treat v6.0.0-beta as pre-release
+          files: ./bin/dist/*.zip
+
+      # ── 8. Keep ZIP artifacts in the Actions UI as well ───────────────────
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: BepInEx_Release_${{ steps.info.outputs.version }}_${{ steps.info.outputs.sha_short }}
+          path: ./bin/dist/*.zip
+          if-no-files-found: error

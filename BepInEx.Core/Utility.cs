@@ -231,7 +231,20 @@ public static class Utility
     {
         if (self.FullName == td.FullName)
             return true;
-        return self.FullName != "System.Object" && (self.BaseType?.Resolve()?.IsSubtypeOf(td) ?? false);
+        if (self.FullName == "System.Object")
+            return false;
+
+        // BaseType이 제네릭 인스턴스(예: BasePlugin<Plugin>)인 경우
+        // Resolve()가 null을 반환할 수 있어 ElementType을 통해 TypeDefinition을 얻는다
+        var baseType = self.BaseType;
+        if (baseType == null)
+            return false;
+
+        TypeDefinition baseTypeDef = baseType.Resolve();
+        if (baseTypeDef == null && baseType is Mono.Cecil.GenericInstanceType git)
+            baseTypeDef = git.ElementType.Resolve();
+
+        return baseTypeDef?.IsSubtypeOf(td) ?? false;
     }
 
     /// <summary>

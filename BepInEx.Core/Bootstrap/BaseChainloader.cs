@@ -43,10 +43,48 @@ public abstract class BaseChainloader<TPlugin>
 
         var metadata = BepInPlugin.FromCecilType(type);
 
+        if (metadata == null)
+        {
+            try
+            {
+                string jsonPath = Path.Combine(Path.GetDirectoryName(assemblyLocation), "plugin.json");
+                if (File.Exists(jsonPath))
+                {
+                    string json = File.ReadAllText(jsonPath);
+                    var guidMatch = Regex.Match(json, @"""GUID""\s*:\s*""([^""]*)""");
+                    var nameMatch = Regex.Match(json, @"""Name""\s*:\s*""([^""]+)""");
+                    var versionMatch = Regex.Match(json, @"""Version""\s*:\s*""([^""]+)""");
+                    var authorMatch = Regex.Match(json, @"""Author""\s*:\s*""([^""]*)""");
+
+                    if (nameMatch.Success && versionMatch.Success)
+                    {
+                        string name = nameMatch.Groups[1].Value;
+                        string version = versionMatch.Groups[1].Value;
+
+                        string guid;
+                        if (guidMatch.Success && !string.IsNullOrEmpty(guidMatch.Groups[1].Value) && guidMatch.Groups[1].Value.Trim().Length > 0)
+                        {
+                            guid = guidMatch.Groups[1].Value;
+                        }
+                        else
+                        {
+                            string author = (authorMatch.Success && !string.IsNullOrEmpty(authorMatch.Groups[1].Value) && authorMatch.Groups[1].Value.Trim().Length > 0) 
+                                ? authorMatch.Groups[1].Value 
+                                : "UnknownAuthor";
+                            guid = $"{author.Replace(" ", "")}.{name.Replace(" ", "")}";
+                        }
+
+                        metadata = new BepInPlugin(guid, name, version);
+                    }
+                }
+            }
+            catch { }
+        }
+
         // Perform checks that will prevent the plugin from being loaded in ALL cases
         if (metadata == null)
         {
-            Logger.Log(LogLevel.Warning, $"Skipping over type [{type.FullName}] as no metadata attribute is specified");
+            Logger.Log(LogLevel.Warning, $"Skipping over type [{type.FullName}] as no metadata attribute or plugin.json is specified");
             return null;
         }
 
@@ -92,8 +130,6 @@ public abstract class BaseChainloader<TPlugin>
     protected static bool HasBepinPlugins(AssemblyDefinition ass)
     {
         if (ass.MainModule.AssemblyReferences.All(r => r.Name != CurrentAssemblyName))
-            return false;
-        if (ass.MainModule.GetTypeReferences().All(r => r.FullName != typeof(BepInPlugin).FullName))
             return false;
 
         return true;

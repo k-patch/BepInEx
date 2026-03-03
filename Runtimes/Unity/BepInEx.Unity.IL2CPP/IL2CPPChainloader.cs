@@ -58,6 +58,12 @@ public class IL2CPPChainloader : BaseChainloader<BasePlugin>
         base.Initialize(gameExePath);
         Instance = this;
 
+        // [RuntimeFix] SteamAchievementFix:
+        // Before GameAssembly.dll is loaded, the Steam library is already loaded into the process.
+        // By patching SteamAPI_RestartAppIfNecessary at the native level,
+        // we ensure that Steam achievements work correctly even in the BepInEx (Doorstop) environment.
+        BepInEx.IL2CPP.RuntimeFixes.SteamAchievementFix.Apply();
+
         if (!NativeLibrary.TryLoad("GameAssembly", typeof(IL2CPPChainloader).Assembly, null, out var il2CppHandle))
         {
             Logger.Log(LogLevel.Fatal,
@@ -131,9 +137,13 @@ public class IL2CPPChainloader : BaseChainloader<BasePlugin>
         var type = pluginAssembly.GetType(pluginInfo.TypeName);
 
         var pluginInstance = (BasePlugin) Activator.CreateInstance(type);
+        pluginInstance.Info = pluginInfo;
 
         PluginLoad?.Invoke(pluginInfo, pluginAssembly, pluginInstance);
         pluginInstance.Load();
+        
+        // Automatically apply Harmony patches after Plugin.Load() is complete
+        pluginInstance.HarmonyInstance?.PatchAll(pluginAssembly);
 
         return pluginInstance;
     }

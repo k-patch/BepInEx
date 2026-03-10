@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using BepInEx.Bootstrap;
 using Mono.Cecil;
 using Range = SemanticVersioning.Range;
@@ -269,7 +270,47 @@ public static class MetadataHelper
         var attributes = pluginType.GetCustomAttributes(typeof(BepInPlugin), false);
 
         if (attributes.Length == 0)
+        {
+            try
+            {
+                var assemblyLocation = pluginType.Assembly.Location;
+                if (!string.IsNullOrEmpty(assemblyLocation))
+                {
+                    string jsonPath = Path.Combine(Path.GetDirectoryName(assemblyLocation), "plugin.json");
+                    if (File.Exists(jsonPath))
+                    {
+                        string json = File.ReadAllText(jsonPath);
+                        var guidMatch = Regex.Match(json, @"""GUID""\s*:\s*""([^""]*)""");
+                        var nameMatch = Regex.Match(json, @"""Name""\s*:\s*""([^""]+)""");
+                        var versionMatch = Regex.Match(json, @"""Version""\s*:\s*""([^""]+)""");
+                        var authorMatch = Regex.Match(json, @"""Author""\s*:\s*""([^""]*)""");
+
+                        if (nameMatch.Success && versionMatch.Success)
+                        {
+                            string name = nameMatch.Groups[1].Value;
+                            string version = versionMatch.Groups[1].Value;
+
+                            string guid;
+                            if (guidMatch.Success && !string.IsNullOrEmpty(guidMatch.Groups[1].Value) && guidMatch.Groups[1].Value.Trim().Length > 0)
+                            {
+                                guid = guidMatch.Groups[1].Value;
+                            }
+                            else
+                            {
+                                string author = (authorMatch.Success && !string.IsNullOrEmpty(authorMatch.Groups[1].Value) && authorMatch.Groups[1].Value.Trim().Length > 0) 
+                                    ? authorMatch.Groups[1].Value 
+                                    : "UnknownAuthor";
+                                guid = $"{author.Replace(" ", "")}.{name.Replace(" ", "")}";
+                            }
+
+                            return new BepInPlugin(guid, name, version);
+                        }
+                    }
+                }
+            }
+            catch { }
             return null;
+        }
 
         return (BepInPlugin) attributes[0];
     }

@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  builder:
+    build: .
+    volumes:
+      # Mount the current project folder to /app in the container to keep build results on the host.
+      - .:/app
+      # Use volumes for package and dependency download caching (improves rebuild speed)
+      - nuget-cache:/root/.nuget/packages
+      - dep-cache:/app/bin/.dep_cache
+      # Game installation path -> Mount to /game in the container (for interop DLL build reference)
+      # - [Game Install Path]:/game:ro
+
+
+volumes:
+  nuget-cache:
+  dep-cache:

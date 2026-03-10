@@ -289,3 +289,12 @@ __pycache__/
 
 # Cake binaries
 tools/
+
+plugins/
+# Gemini and bkit settings
+.agent/
+.agents/
+.bkit/
+.gemini/
+.pdca-status.json
+plugins/

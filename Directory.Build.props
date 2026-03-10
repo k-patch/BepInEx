@@ -6,7 +6,7 @@
         <Nullable>disable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <PackageLicenseExpression>LGPL-2.1-only</PackageLicenseExpression>
-        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <GenerateDocumentationFile>false</GenerateDocumentationFile>
         <DebugType>embedded</DebugType>
         <Configurations>Debug;Release</Configurations>
         <PackageProjectUrl>https://github.com/BepInEx/BepInEx</PackageProjectUrl>
@@ -21,6 +21,6 @@
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     </PropertyGroup>
     <ItemGroup>
-        <None Include="$(SolutionDir)\assets\logos\logo.png" Pack="true" Visible="false" PackagePath=""/>
+        <None Include="$(MSBuildThisFileDirectory)assets/logos/logo.png" Pack="true" Visible="false" PackagePath=""/>
     </ItemGroup>
 </Project>

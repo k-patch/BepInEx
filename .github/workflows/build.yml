@@ -6,12 +6,12 @@ jobs:
     build:
         runs-on: ubuntu-latest
         steps:
-            -   uses: actions/checkout@v3
+            -   uses: actions/checkout@v4
                 with:
                     fetch-depth: 0 # Need to fetch all for proper history
             -   name: Collect build info
                 id: info
-                uses: actions/github-script@v6
+                uses: actions/github-script@v7
                 with:
                     script: |
                         let buildType = "Development";
@@ -34,7 +34,7 @@ jobs:
                     branch: master
                     workflow_id: build.yml
                     github_token: ${{ secrets.GITHUB_TOKEN }}
-            -   uses: actions/setup-dotnet@v1
+            -   uses: actions/setup-dotnet@v4
                 with:
                     dotnet-version: "6.0.x"
             -   name: Build
@@ -72,7 +72,7 @@ jobs:
                           ]
                         }
             -   name: Upload Artifacts
-                uses: actions/upload-artifact@v2.2.4
+                uses: actions/upload-artifact@v4
                 with:
                     path: "./bin/dist/*.zip"
                     name: "BepInEx_CI_${{ steps.info.outputs.build_type }}_${{ steps.info.outputs.sha_short }}_${{ steps.info.outputs.build_id || 0 }}"
